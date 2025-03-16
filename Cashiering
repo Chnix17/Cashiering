@@ -1,0 +1,1046 @@
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Scanner;
+import java.sql.*;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+
+class Transaction {
+    String customerName;
+
+    public Transaction(String customerName) {
+        this.customerName = customerName;
+    }
+
+    public String getCus() {
+        return customerName;
+    }
+
+}
+class Account {
+    String username;
+    String password;
+
+    public Account(String username, String password) {
+
+        this.username = username;
+        this.password = password;
+    }
+}
+
+
+
+class Item {
+    String name;
+    String sname;
+    double price;
+    int quantity;
+
+    public Item(String name, String sname, double price, int quantity) {
+        this.name = name;
+        this.sname = sname;
+        this.price = price;
+        this.quantity = quantity;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public String getSname() {
+        return sname;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+}
+
+class Cart {
+    ArrayList<Item> items;
+    ArrayList<Transaction> trans;
+    public Cart() {
+    	items = new ArrayList<Item>();
+    	trans = new ArrayList<Transaction>();
+    }
+   
+
+   
+
+    public void addItem(Item item) {
+        items.add(item);
+    }
+
+    public void removeItem(int index) {
+        if (index >= 0 && index < items.size()) {
+            items.remove(index);
+        }
+    }
+
+    public ArrayList<Item> getItems() {
+        return items;
+    }
+
+    
+    public double calculateTotal() {
+        double total = 0.0;
+        for (Item item : items) {
+            total += item.getPrice();
+        }
+        return total;
+    }
+
+    public void generateReceipt(double change) {
+        try {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            Date date = new Date();
+
+            // Print the receipt
+            System.out.println("\nMALDITO CDO RECEIPT");
+            System.out.println("Date and Time: " + dateFormat.format(date));
+            System.out.println("===================================");
+            System.out.println("Item             Size  Quantity  Price");
+            System.out.println("===================================");
+
+            for (Item item : items) {
+                System.out.printf("%-15S %-5S %-5d $%.2f\n", item.getName(), item.getSname(), item.getQuantity(),
+                        item.getPrice());
+            }
+
+            System.out.println("===================================");
+            System.out.printf("Total           $%.2f\n", calculateTotal());
+            System.out.printf("Change          $%.2f\n", change);
+            System.out.println("===================================\n");
+
+            // Add transaction to history
+            
+        } catch (Exception e) {
+            System.out.println("An error occurred while generating the receipt: " + e.getMessage());
+        }
+    }
+    
+
+    public void addCustomer(Transaction customer) {
+    	trans.add(customer);
+    }
+    public void clearCart() {
+        items.clear();
+    }
+     
+    public static PreparedStatement pst;
+    public static ResultSet rs;
+    
+
+    
+
+    
+}
+
+
+public class draft2{
+    public static Connection conn;
+    private static PreparedStatement pst;
+    private static ResultSet rs;
+	public static Account loggedInAccount; // Track the currently logged-in account
+    public static List<Account> accounts = new ArrayList<>();
+    public static Scanner scanner = new Scanner(System.in);
+   public  static Cart cart = new Cart();
+    public static String customerName;
+    
+    
+    public static void main(String[] args) {
+        conn = connect();
+    if (conn != null) {
+        log();
+        viewCustomerData();
+    } else {
+        System.out.println("Failed to connect to the database.");
+    }
+
+        
+        
+    }
+    private static Connection connect() {
+        try {
+            String url = "jdbc:mysql://localhost:3306/admin";
+            String user = "admin";
+            String password = "password";
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            return DriverManager.getConnection(url, user, password);
+        } catch (SQLException | ClassNotFoundException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    public static void viewCustomerData() {
+    if (conn == null) {
+        System.out.println("Connection is null. Cannot retrieve customer data.");
+        return;
+    }
+
+    try {
+        String sql = "SELECT * FROM customer";
+        PreparedStatement pst = conn.prepareStatement(sql);
+        ResultSet rs = pst.executeQuery();
+
+        // Ask the user for customer details to update
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("[1] View Data\n[2] Back");
+        int option = scanner.nextInt();
+
+        switch (option) {
+            case 1:
+                System.out.println("Customer Data:");
+                while (rs.next()) {
+                    
+                    int customerID = rs.getInt("customer_ID");
+                    String firstName = rs.getString("customer_Firstname");
+                    String middleName = rs.getString("customer_Middlename");
+                    String lastName = rs.getString("customer_Lastname");
+                    System.out.println("Customer ID: " + customerID + ", Name: " + firstName + " " + middleName + " " + lastName);
+                }
+
+                System.out.print("[1] Edit\n[2] Remove\n[3]DELETE ALL\nEnter choice: ");
+                int choice = scanner.nextInt();
+                scanner.nextLine(); // Consume the newline character
+
+                switch (choice) {
+                    case 1:
+                        System.out.print("Enter Customer ID to update: ");
+                        int customerIDToUpdate = scanner.nextInt();
+                        scanner.nextLine(); // Consume the newline character
+
+                        System.out.print("Enter New First Name: ");
+                        String newFirstName = scanner.nextLine();
+
+                        System.out.print("Enter New Middle Name: ");
+                        String newMiddleName = scanner.nextLine();
+
+                        System.out.print("Enter New Last Name: ");
+                        String newLastName = scanner.nextLine();
+
+                        try {
+                            String sql1 = "UPDATE customer SET customer_Firstname = ?, customer_Middlename = ?, customer_Lastname = ? WHERE customer_ID = ?";
+                            PreparedStatement pst1 = conn.prepareStatement(sql1);
+                            pst1.setString(1, newFirstName);
+                            pst1.setString(2, newMiddleName);
+                            pst1.setString(3, newLastName);
+                            pst1.setInt(4, customerIDToUpdate);
+                            int rowsUpdated = pst1.executeUpdate();
+
+                            if (rowsUpdated > 0) {
+                                System.out.println("Customer with ID " + customerIDToUpdate + " updated successfully.");
+                                viewCustomerData();
+                            } else {
+                                System.out.println("No customer found with ID " + customerIDToUpdate + ". Update failed.");
+                                viewCustomerData();
+                            }
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                        }
+                        break;
+                    case 2:
+                        System.out.print("Enter Customer ID to remove: ");
+                        int customerIDToRemove = scanner.nextInt();
+
+                        try {
+                            String sql2 = "DELETE FROM customer WHERE customer_ID = ?";
+                            PreparedStatement pst2 = conn.prepareStatement(sql2);
+                            pst2.setInt(1, customerIDToRemove);
+                            int rowsDeleted = pst2.executeUpdate();
+
+                            if (rowsDeleted > 0) {
+                                System.out.println("[1] View Data\n[2] Back");
+                                System.out.println("Customer with ID " + customerIDToRemove + " removed successfully.");
+                                viewCustomerData();
+                            } else {
+                                System.out.println("No customer found with ID " + customerIDToRemove + ". Removal failed.");
+                                viewCustomerData();
+                            }
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                        }
+                        break;
+                    case 3:
+                        // Add case for deleting all data
+                        try {
+                            String sql3 = "DELETE FROM customer";
+                            PreparedStatement pst3 = conn.prepareStatement(sql3);
+                            int rowsDeleted = pst3.executeUpdate();
+
+                            if (rowsDeleted > 0) {
+                                System.out.println("All customer data removed successfully.");
+                            } else {
+                                System.out.println("No customer data found to delete.");
+                                viewCustomerData();
+                            }
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                        }   
+                        break;
+                    default:
+                        System.out.println("Invalid choice.");
+                    
+                }
+                break;
+            case 2:
+                menu();
+                break;
+            default:
+                System.out.println("Invalid option.");
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+}
+
+
+    public static void log() {
+    boolean loggedIn = false;
+
+    System.out.println("\nMaldito Cashiering System");
+    System.out.println("[1] admin");
+    System.out.println("[2] cashier");
+    System.out.println("[3] Exit");
+  
+    
+
+            
+            
+            
+    
+
+    
+     try{
+         String admin_user = "";
+         String admin_pass = "";    
+         String sql = "SELECT * FROM adminuser  WHERE admin_ID = 1";
+         pst = conn.prepareStatement(sql);
+            rs = pst.executeQuery();
+            if (rs.next()){
+                admin_user = rs.getString(2);
+                admin_pass = rs.getString(3);
+            }
+        
+        while (true) {
+            if (!loggedIn) {
+                System.out.print("Enter choice: ");
+                String loginChoice = scanner.nextLine();
+
+                if (loginChoice.equals("1")) {
+                    // Perform login (existing code)
+                    System.out.print("Enter username: ");
+                    String Username = scanner.next();
+                    System.out.print("Enter password: ");
+                    String Password = scanner.next();
+
+                    
+                        if (admin_user.equals(Username) && admin_pass.equals(Password)) {
+                            System.out.println("Successfully login! ");
+                             loggedIn = true;
+                           System.out.println("[1]Admin panel\n[2]Logout\n");
+                           while(true){
+                            try{
+                                System.out.print(">>");
+                                int choice1 = scanner.nextInt();
+                                
+                                if(choice1 == 1){
+                                  if (conn == null) {
+                    System.out.println("Connection is null. Cannot retrieve transaction history.");
+                } else {
+                    // Check if there are any transaction history records
+                    try {
+                        String sql3 = "SELECT * FROM customer";
+                        PreparedStatement pst = conn.prepareStatement(sql3);
+                        ResultSet rs = pst.executeQuery();
+                        
+                        if (!rs.next()) {
+                            System.out.println("No transaction history data found.");
+                        } else {
+                            viewCustomerData();
+                        }
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
+                                }else if(choice1 == 2){
+                                    System.out.println("\nSuccessfully logout\n");
+                                    scanner.nextLine();
+                                    log();
+                                }
+                            
+                            }catch(Exception e){
+                              System.out.println("Invalid input");
+                              scanner.nextLine();
+                            }
+                           }
+                           
+                          
+                            
+                        }
+                    
+                    if (!loggedIn) {
+                        System.out.println("Login failed. Invalid credentials.");
+                        scanner.nextLine();
+                    }
+                } else if (loginChoice.equals("2")) {
+                                        cashier();
+                } else if (loginChoice.equals("3")) {
+                    System.out.println("Thank you for using the Maldito Cashiering System!");
+                    System.exit(0);
+                } else {
+                    System.out.println("Invalid choice. Please select a valid option.");
+                }
+            } else {
+                System.out.println("\n[Successfully logged in!]");
+                System.out.println("\nMaldito Cashiering System");
+                menu();
+            }
+        }
+     }catch(SQLException e){
+       e.printStackTrace();
+     }
+    
+    
+    
+}
+
+    
+    public static void cashier(){
+          try {
+        String cash_user = "";
+        String cash_pass = "";    
+        String sql1 = "SELECT * FROM cash WHERE cash_ID = 1";
+        PreparedStatement pst = conn.prepareStatement(sql1);
+        ResultSet rs = pst.executeQuery();
+        if (rs.next()) {
+            cash_user = rs.getString(2);
+            cash_pass = rs.getString(3);
+        }
+
+        System.out.print("Enter username: ");
+        String username = scanner.next();
+        System.out.print("Enter password: ");
+        String password = scanner.next();
+
+        if (cash_user.equals(username) && cash_pass.equals(password)) {
+            System.out.println("Successfully logged in as cashier!");
+            menu(); // Redirect to the cashier menu
+        } else {
+            System.out.println("Login failed. Invalid credentials.");
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    }
+    public static void menu() {
+        
+    	
+    	    
+
+        while(true) {
+        System.out.println("1. Add to cart");
+        System.out.println("2. Logout");
+
+        int choice = 0;
+
+        do {
+            try {
+                System.out.print("Select an option: ");
+                choice = scanner.nextInt();
+                System.out.println("\n");
+                break;
+            } catch (Exception e) {
+                System.out.println("Invalid input. Please enter a valid numeric choice.");
+                scanner.nextLine();
+            }
+        } while (true);
+        
+
+        switch (choice) {
+            case 1:
+            	
+                opt(cart);
+                break;
+            case 2:
+                System.out.println("\n[Successful logout]");
+                scanner.nextLine();
+                log();
+                break;
+            case 3:
+                if (conn == null) {
+                    System.out.println("Connection is null. Cannot retrieve transaction history.");
+                } else {
+                    // Check if there are any transaction history records
+                    try {
+                        String sql3 = "SELECT * FROM customer";
+                        PreparedStatement pst = conn.prepareStatement(sql3);
+                        ResultSet rs = pst.executeQuery();
+                        
+                        if (!rs.next()) {
+                            System.out.println("No transaction history data found.");
+                        } else {
+                            viewCustomerData();
+                        }
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
+                break;
+
+            default:
+                System.out.println("Invalid choice. Please select a valid option.");
+        }
+        scanner.nextLine();
+    }
+    }
+
+    public static void opt(Cart cart) {
+        Scanner scanner = new Scanner(System.in);
+        boolean backToProductMenu = false;
+        System.out.println("                                       -MENU OPTION-");
+            System.out.print("[1] TS101 - 100PHP\n[2] P310 - 50PHP\n[3] S10 - 150PHP\n[4] H201 - 200PHP\n[5] back: ");
+
+        while (!backToProductMenu) {
+            System.out.println("Enter Choice: ");
+
+            try {
+                int choice1 = scanner.nextInt();
+                
+                switch(choice1){
+                    case 1:
+                       pro1(cart);
+                       break;
+                    case 2:
+                       pro2(cart);
+                       break;
+                    case 3:
+                       swet(cart); 
+                       break;
+                    case 4:
+                       hood(cart); 
+                       break;
+                    case 5:
+                       menu(); 
+                       break;
+                    default:
+                        break;
+                }
+
+                if (choice1 == 1) {
+                    pro1(cart);
+                } else if (choice1 == 2) {
+                    pro2(cart);
+                } else if (choice1 == 3) {
+                    swet(cart);
+                } else if (choice1 == 4) {
+                    hood(cart);
+                } else if (choice1 == 5) {
+                    menu();
+                } else {
+                    System.out.print("Invalid inppt");
+                    opt(cart);
+                    scanner.nextLine();
+                }
+            } catch (Exception e) {
+                System.out.println("Invalid input. Please enter a valid numeric choice.");
+                scanner.nextLine();
+            }
+        }
+    }
+
+    static void pro1(Cart cart) {
+        Scanner user = new Scanner(System.in);
+        int choice5;
+        int quan;
+        System.out.println("                                                -Sizes-");
+        System.out.println("\n[1] XS\n[2] S\n[3] M\n[4] L\n[5] XL\n[6] BACK");
+        System.out.println("\n");
+
+        int choice4;
+
+        while(true){
+        try {
+            System.out.print("Enter choice: ");
+            choice4 = scanner.nextInt();
+            if (choice4 >= 1 && choice4 <= 5) {
+            while (true) {
+                try {
+                    System.out.print("Enter Quantity: ");
+                    quan = user.nextInt();
+                    break;
+                } catch (Exception e) {
+                    System.out.println("Invalid input. Please enter a valid numeric quantity.");
+                    user.nextLine();
+                }
+            }
+            System.out.println(" ");
+                    System.out.print("Confirm this product? [1] YES [2] NO");
+                    System.out.println("\n");
+            while (true) {
+                try {
+                    
+                    System.out.print("Enter choice: ");
+                    choice5 = user.nextInt();
+                    
+                    
+                    break;
+                } catch (Exception e) {
+                    System.out.println("Invalid input. Please enter a valid numeric choice.");
+                    user.nextLine();
+                }
+            }
+
+            if (choice5 == 1) {
+                String iname = "TS101";
+                String sname = "";
+                int price = 0;
+
+                switch (choice4) {
+                    case 1:
+                        sname = "XS";
+                        price = 100;
+                        break;
+                    case 2:
+                        sname = "S";
+                        price = 100;
+                        break;
+                    case 3:
+                        sname = "M";
+                        price = 100;
+                        break;
+                    case 4:
+                        sname = "L";
+                        price = 100;
+                        break;
+                    case 5:
+                        sname = "XL";
+                        price = 100;
+                        break;
+                }
+
+                int totalPrice = price * quan;
+                Item item = new Item(iname, sname, totalPrice, quan);
+
+                cart.addItem(item);
+                opt2(cart);
+            } else {
+                System.out.print("Invalid input");
+                opt(cart);
+            }
+        } else if (choice4 == 6) {
+            menu();
+        }
+        } catch (Exception e) {
+            System.out.println("Invalid input. Please enter a valid numeric choice.");
+            user.nextLine();
+        }
+        }
+    }
+    
+
+    static void pro2(Cart cart) {
+        Scanner user = new Scanner(System.in);
+        int choice5;
+        int quan;
+        System.out.println("                                                -Sizes-");
+        System.out.println("\n[1] XS\n[2] S\n[3] M\n[4] L\n[5] XL\n[6] BACK");
+        System.out.println("\n");
+
+        int choice4;
+        while(true){
+        try {
+            System.out.println("Enter choice: ");
+            choice4 = scanner.nextInt();
+            if (choice4 >= 1 && choice4 <= 5) {
+            while (true) {
+                try {
+                    System.out.print("Enter Quantity: ");
+                    quan = user.nextInt();
+                    break;
+                } catch (Exception e) {
+                    System.out.println("Invalid input. Please enter a valid numeric quantity.");
+                    user.nextLine();
+                }
+            }
+            while (true) {
+                try {
+                    System.out.println(" ");
+                    System.out.print("Confirm this product? [1] YES [2] NO");
+                    System.out.println("\n");
+                    System.out.print("Enter choice: ");
+                    choice5 = user.nextInt();
+                    break;
+                } catch (Exception e) {
+                    System.out.println("Invalid input. Please enter a valid numeric choice.");
+                    user.nextLine();
+                }
+            }
+
+            if (choice5 == 1) {
+                String iname = "P310";
+                String sname = "";
+                int price = 0;
+
+                switch (choice4) {
+                    case 1:
+                        sname = "XS";
+                        price = 50;
+                        break;
+                    case 2:
+                        sname = "S";
+                        price = 50;
+                        break;
+                    case 3:
+                        sname = "M";
+                        price = 50;
+                        break;
+                    case 4:
+                        sname = "L";
+                        price = 50;
+                        break;
+                    case 5:
+                        sname = "XL";
+                        price = 50;
+                        break;
+                }
+
+                int totalPrice = price * quan;
+                Item item = new Item(iname, sname, totalPrice, quan);
+
+                cart.addItem(item);
+                opt2(cart);
+            } else {
+                System.out.print("Invalid input");
+                opt(cart);
+            }
+        } else if (choice4 == 6) {
+            menu();
+        }
+        } catch (Exception e) {
+            System.out.println("Invalid input. Please enter a valid numeric choice.");
+            user.nextLine();
+        }
+        }
+
+        
+    }
+
+    static void opt2(Cart cart) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Successfully added!");
+        System.out.println("[1] Add another product\n[2] Remove item\n[3] View cart\n[4] Payment");
+        System.out.print("Enter choice: ");
+        int choice = scanner.nextInt();
+
+        switch (choice) {
+            case 1:
+                opt(cart);
+                break;
+            case 2:
+                rem(cart);
+                break;
+            case 3:
+                car1(cart);
+                break;
+            case 4:
+            	pay(cart);
+                break;
+            default:
+                opt2(cart);
+        }
+    }
+
+    static void rem(Cart cart) {
+        System.out.println("                                                        -Remove Item");
+        Scanner scanner = new Scanner(System.in);
+        ArrayList<Item> itemsInCart = cart.getItems();
+        if (itemsInCart.isEmpty()) {
+            System.out.println("Cart is empty. Add items to remove an item.");
+        } else {
+            for (int i = 0; i < itemsInCart.size(); i++) {
+                Item item = itemsInCart.get(i);
+                System.out.println(i + ": " + item.getName() + " - " + item.getSname() + " - Quantity: " + item.getQuantity() + " - Price: $" + item.getPrice());
+            }
+            System.out.println("Select the item you want to remove (0 to " + (itemsInCart.size() - 1) + "): ");
+            try {
+                int index = scanner.nextInt();
+                if (index >= 0 && index < itemsInCart.size()) {
+                    Item itemToRemove = itemsInCart.get(index);
+                    itemsInCart.remove(index);
+                    System.out.println(itemToRemove.getName() + " - " + itemToRemove.getSname() + " - Quantity: " + itemToRemove.getQuantity() + " has been removed from your cart.");
+                    car1(cart);
+                } else {
+                    System.out.println("Invalid item index. Please select a valid index.");
+                    rem(cart);
+                }
+            } catch (Exception e) {
+                System.out.println("Invalid input. Please enter a valid numeric index.");
+                rem(cart);
+            }
+        }
+    }
+
+    static void car1(Cart cart) {
+        Scanner scanner = new Scanner(System.in);
+        ArrayList<Item> itemsInCart = cart.getItems();
+        System.out.println("                                                        -View Cart");
+        System.out.println("Items in your cart:");
+
+        if (itemsInCart.isEmpty()) {
+            System.out.println("No items in the cart.");
+        } else {
+            for (int i = 0; i < itemsInCart.size(); i++) {
+                Item item = itemsInCart.get(i);
+                System.out.println(i + ": " + item.getName() + " - " + item.getSname() + " - Quantity: " + item.getQuantity() + " - Price: $" + item.getPrice());
+            }
+            opt2(cart);
+        }
+
+        
+        
+        
+    }
+
+    static void pay(Cart cart) {
+    	    try{
+                Scanner scanner = new Scanner(System.in);
+                String customerName = "";
+                String customermiddleName = "";
+                String customerlastName ="";
+                
+    	    double total = cart.calculateTotal();
+    	    int change;
+    	    double amountPaid;
+    	    int index;
+    	    System.out.println("                                                        -Payment Options");
+    	    while (true) {
+    	        try {
+                    System.out.print("Total: "+total);
+    	            System.out.println("Enter amount paid: $");
+    	            amountPaid = scanner.nextDouble();
+    	            break;
+    	        } catch (Exception e) {
+    	            System.out.println("Invalid input. Please enter a valid numeric amount.");
+    	            scanner.nextLine();
+    	        }
+    	    }
+
+    	    change = (int) (amountPaid - total);
+
+    	    if (amountPaid < total) {
+    	        System.out.println("Insufficient payment! Please enter a valid amount.");
+    	        pay(cart);
+    	    } else {
+    	        if (change > 0) {
+    	            System.out.println("Change: $" + change);
+    	        }
+                System.out.print("Enter Customer firstname: ");
+    	scanner.nextLine(); // Consume the newline character left in the buffer
+    	customerName = scanner.nextLine();
+        System.out.print("Enter Customer lastname: ");
+    	customermiddleName = scanner.nextLine();
+        System.out.print("Enter Customer lastname: ");
+
+    	customerlastName = scanner.nextLine();
+                Transaction trans = new Transaction(customerName);
+    	    cart.addCustomer(trans);
+            String sq3 = "INSERT INTO customer (customer_Firstname, customer_Middlename, customer_Lastname) VALUES (?,?,?)";
+            PreparedStatement pst = conn.prepareStatement(sq3);
+            pst.setString(1, customerName);
+            pst.setString(2, customermiddleName);
+            pst.setString(3, customerlastName);
+            pst.executeUpdate();
+    	        cart.generateReceipt(change);
+    	        cart.clearCart(); // Clear the cart after generating the receipt
+                
+
+    	        System.out.println("Thank you for shopping at MALDITO CDO!");
+
+    	        menu();
+    	    }
+            
+            }catch(SQLException e){
+              e.printStackTrace();
+            }
+    	}
+    static void swet(Cart cart) {
+        Scanner user = new Scanner(System.in);
+        int choice5;
+        int quan;
+        System.out.println("                                                -Sizes-");
+        System.out.println("\n[1] XS\n[2] S\n[3] M\n[4] L\n[5] XL\n[6] BACK");
+        System.out.println("\n");
+
+        int choice4;
+        while(true){
+        try {
+            System.out.print("Enter choice: ");
+            choice4 = scanner.nextInt();
+            if (choice4 >= 1 && choice4 <= 5) {
+            while (true) {
+                try {
+                    System.out.print("Enter Quantity: ");
+                    quan = user.nextInt();
+                    break;
+                } catch (Exception e) {
+                    System.out.println("Invalid input. Please enter a valid numeric quantity.");
+                    user.nextLine();
+                }
+            }
+            while (true) {
+                try {
+                    System.out.println(" ");
+                    System.out.print("Confirm this product? [1] YES [2] NO");
+                    System.out.println("\n");
+                    System.out.print("Enter choice: ");
+                    choice5 = user.nextInt();
+                    break;
+                } catch (Exception e) {
+                    System.out.println("Invalid input. Please enter a valid numeric choice.");
+                    user.nextLine();
+                }
+            }
+
+            if (choice5 == 1) {
+                String iname = "S10";
+                String sname = "";
+                int price = 0;
+
+                switch (choice4) {
+                    case 1:
+                        sname = "XS";
+                        price = 150;
+                        break;
+                    case 2:
+                        sname = "S";
+                        price = 150;
+                        break;
+                    case 3:
+                        sname = "M";
+                        price = 150;
+                        break;
+                    case 4:
+                        sname = "L";
+                        price = 150;
+                        break;
+                    case 5:
+                        sname = "XL";
+                        price = 150;
+                        break;
+                }
+
+                int totalPrice = price * quan;
+                Item item = new Item(iname, sname, totalPrice, quan);
+
+                cart.addItem(item);
+                opt2(cart);
+            } else {
+                System.out.print("Invalid input");
+                opt(cart);
+            }
+        } else if (choice4 == 6) {
+            menu();
+        }
+        } catch (Exception e) {
+            System.out.println("Invalid input. Please enter a valid numeric choice.");
+            user.nextLine();
+        }
+        }
+    }
+
+    static void hood(Cart cart) {
+        Scanner user = new Scanner(System.in);
+        int choice5;
+        int quan;
+        System.out.println("                                                -Sizes-");
+        System.out.println("\n[1] XS\n[2] S\n[3] M\n[4] L\n[5] XL\n[6] BACK");
+        System.out.println("\n");
+
+        int choice4;
+        while(true){
+        try {
+            System.out.print("Enter choice: ");
+            choice4 = scanner.nextInt();
+            if (choice4 >= 1 && choice4 <= 5) {
+            while (true) {
+                try {
+                    System.out.print("Enter Quantity: ");
+                    quan = user.nextInt();
+                    break;
+                } catch (Exception e) {
+                    System.out.println("Invalid input. Please enter a valid numeric quantity.");
+                    user.nextLine();
+                }
+            }
+            while (true) {
+                try {
+                    System.out.println(" ");
+                    System.out.print("Confirm this product? [1] YES [2] NO");
+                    System.out.println("\n");
+                    System.out.print("Enter choice: ");
+                    choice5 = user.nextInt();
+                    break;
+                } catch (Exception e) {
+                    System.out.println("Invalid input. Please enter a valid numeric choice.");
+                    user.nextLine();
+                }
+            }
+
+            if (choice5 == 1) {
+                String iname = "H201";
+                String sname = "";
+                int price = 0;
+
+                switch (choice4) {
+                    case 1:
+                        sname = "XS";
+                        price = 200;
+                        break;
+                    case 2:
+                        sname = "S";
+                        price = 200;
+                        break;
+                    case 3:
+                        sname = "M";
+                        price = 200;
+                        break;
+                    case 4:
+                        sname = "L";
+                        price = 200;
+                        break;
+                    case 5:
+                        sname = "XL";
+                        price = 200;
+                        break;
+                }
+
+                int totalPrice = price * quan;
+                Item item = new Item(iname, sname, totalPrice, quan);
+
+                cart.addItem(item);
+                opt2(cart);
+            } else {
+                System.out.print("Invalid input");
+                opt(cart);
+            }
+        } else if (choice4 == 6) {
+            menu();
+        }
+        } catch (Exception e) {
+            System.out.println("Invalid input. Please enter a valid numeric choice.");
+            user.nextLine();
+        }
+        }
+    }
+
+}
